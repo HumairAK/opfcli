@@ -17,7 +17,7 @@ var validRoles = map[string]bool{
 	"edit":  true,
 }
 
-func createNamespace(projectName, projectOwner, projectDescription string) error {
+func createNamespace(projectName, projectOwner, projectDescription string, existsOk bool) error {
 	appName := config.GetString("app-name")
 	path := filepath.Join(repoDirectory, appName, namespacePath, projectName, "namespace.yaml")
 
@@ -27,6 +27,10 @@ func createNamespace(projectName, projectOwner, projectDescription string) error
 	}
 
 	if exists {
+		if existsOk {
+			log.Printf("namespace already exists (continuing)")
+			return nil
+		}
 		return fmt.Errorf("namespace %s already exists", projectName)
 	}
 
@@ -196,5 +200,80 @@ func addGroupRBAC(projectName, groupName, roleName string) error {
 		return err
 	}
 
+	return nil
+}
+
+func addNamespaceToCluster(ns, env, cluster string) error {
+	appName := config.GetString("app-name")
+	clusterPath := filepath.Join(repoDirectory, appName, overlaysPath, env, cluster)
+	nsPath := filepath.Join(appRootRelPath, namespacePath, ns)
+	exists, err := utils.PathExists(filepath.Dir(clusterPath))
+
+	if err != nil {
+		return err
+	} else if !exists {
+		log.Printf("Kustomization for overlay does not exist, creating.")
+		if err := os.MkdirAll(clusterPath, 0755); err != nil {
+			return err
+		}
+		if err := utils.WriteKustomization(clusterPath, []string{nsPath}, []string{}); err != nil{
+			return err
+		}
+	}
+
+	if err := utils.AddKustomizeResource(clusterPath, nsPath); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func addGroupToCluster(groupName, env, cluster string, users []string) error {
+	appName := config.GetString("app-name")
+	clusterPath := filepath.Join(repoDirectory, appName, overlaysPath, env, cluster)
+	groupPath := filepath.Join(clusterPath, "groups", groupName + ".enc.yaml")
+	var group models.Group
+	var err error
+
+	if exists, err := utils.PathExists(groupPath); err != nil {
+		return err
+	} else if exists {
+		log.Printf("group %s in cluster %s already exists, appending existing users list", groupName, cluster)
+		group, err = models.GroupFromYAMLPath(groupPath)
+		if err != nil {
+			return err
+		}
+		for _, user := range users {
+			if !group.Contains(user) {
+				group.Users = append(group.Users, user)
+			}
+		}
+	} else {
+		dirExists, err := utils.PathExists(filepath.Dir(groupPath))
+		if err != nil {
+			return err
+		}
+		if !dirExists {
+			log.Printf("group directory for cluster not found, creating a new one... %s", filepath.Dir(groupPath))
+			if err := os.MkdirAll(filepath.Dir(groupPath), 0755); err != nil {
+				return fmt.Errorf("failed to create group directory: %w", err)
+			}
+		}
+		group = models.NewGroup(groupName)
+		group.Users = users
+	}
+
+	groupOut := models.ToYAML(group)
+
+	err = ioutil.WriteFile(groupPath, groupOut, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write group: %w", err)
+	}
+
+	return nil
+}
+
+func addUsersToGroupInCluster(user, group, env, cluster string, pgpKeys []string) error {
+	fmt.Println("adding namespace to cluster")
 	return nil
 }

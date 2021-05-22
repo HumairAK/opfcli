@@ -77,3 +77,24 @@ func AddKustomizeComponent(path, componentPath string) error {
 
 	return nil
 }
+
+// AddKustomizeResource adds a resource to an existing kustomization file.
+func AddKustomizeResource(path, resPath string) error {
+	kustomizePath := filepath.Join(path, "kustomization.yaml")
+	log.Debugf("updating kustomization for %s", path)
+
+	kustom, err := models.KustomizeFromYAMLPath(kustomizePath)
+	if err != nil {
+		return err
+	}
+
+	kustom.Components = append(kustom.Resources, resPath)
+	kustomOut := models.ToYAML(kustom)
+	err = ioutil.WriteFile(kustomizePath, kustomOut, 0644)
+	if err != nil {
+		return err
+	}
+
+	return nil
+
+}

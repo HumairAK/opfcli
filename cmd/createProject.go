@@ -22,7 +22,7 @@ var createProjectCmd = &cobra.Command{
 		projectOwner := args[1]
 		projectDescription := cmd.Flag("description").Value.String()
 
-		if err = createNamespace(projectName, projectOwner, projectDescription); err != nil {
+		if err = createNamespace(projectName, projectOwner, projectDescription, false); err != nil {
 			return err
 		}
 		if err = createAdminRoleBinding(projectName, projectOwner); err != nil {

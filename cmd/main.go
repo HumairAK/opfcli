@@ -21,6 +21,8 @@ const namespacePath = "base/core/namespaces"
 const groupPath = "base/user.openshift.io/groups"
 const componentPath = "components"
 const componentRelPath = "../../../../components"
+const overlaysPath  = "overlays"
+const appRootRelPath = "../../.."
 
 var config = viper.New()
 
